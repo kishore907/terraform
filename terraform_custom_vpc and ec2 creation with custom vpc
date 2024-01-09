@@ -1,0 +1,78 @@
+provider "aws" {
+  region="us-east-1"
+}
+#create vpc
+resource "aws_vpc" "myvpc" {
+  cidr_block = "192.168.0.0/25"
+  tags = {
+    Name = "dev_usa"
+  }
+}
+# create subnets
+resource "aws_subnet" "myvpc" {
+  vpc_id            = aws_vpc.myvpc.id
+  cidr_block        = "192.168.0.0/27"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "dev_usa_pub"
+  }
+
+}
+//create internetgateway
+resource "aws_internet_gateway" "myvpc_ig" {
+  vpc_id = aws_vpc.myvpc.id
+}
+
+#create route table
+resource "aws_route_table" "myvpc_rt" {
+  vpc_id = aws_vpc.myvpc.id
+  route  {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myvpc_ig.id
+  }
+}
+//associate route table with subnet
+resource "aws_route_table_association" "myvpc_rta" {
+  subnet_id      = aws_subnet.myvpc.id
+  route_table_id = aws_route_table.myvpc_rt.id
+}
+//create security group with in the vpc with port http:80 and ssh:22 in inbound traffic rules
+resource "aws_security_group" "myvpc_sg" {
+  name        = "usa_sg"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.myvpc.id
+
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
+  }
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
+  }
+
+
+
+  tags = {
+    Name = "ssk_sg"
+  }
+}
+resource "aws_instance" "ssk" {
+    availability_zone = "us-east-1a"
+    ami = "ami-0005e0cfe09cc9050"
+    instance_type = "t2.micro"
+    key_name = "ssk_usa"
+  subnet_id = aws_subnet.myvpc.id
+    vpc_security_group_ids = [ aws_security_group.myvpc_sg.id ]
+  tags = {
+    Name="custom_usainstance"
+  }
+}
